@@ -1,0 +1,14 @@
+#server，client
+role: client
+
+#NATProxy Server addr
+server: 127.0.0.1:8001
+
+#The trusted CA certificate file in PEM format used to verify the cert.
+ca_cert: ./config/ca.pem
+
+#Certificate/key  used for mTLS between server/client nodes.
+cert: ./config/client1.pem
+key: ./config/client1.key
+
+log_level: trace

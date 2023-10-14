@@ -1,0 +1,41 @@
+#server，client
+role: server
+
+#server listen address
+listen: 127.0.0.1:8001
+
+#The trusted CA certificate file in PEM format used to verify the cert.
+ca_cert: ./config/ca.pem
+
+#Certificate/key  used for mTLS between server/client nodes.
+cert: ./config/server.pem
+key: ./config/server.key
+
+log_level: trace
+#proxy mode enables. default: [tcp]
+#proxy_on: [tcp, socks5, http, https, httpreverse, udp]
+
+# proxy mapping
+mappings:
+  #http proxy
+  #- name: web-proxy
+  #  mode: http
+  #  listen: 0.0.0.0:8003
+  #  domain: localhost
+  #  headers:
+  #    - [proxy, +, x-forward-for, $client_ip]
+  #    - [proxy, +, from, $url]
+  #    - [+, key, value]
+  #  #  - [-, etag]
+  #    - [+, last-modified, aaaa]
+      
+  #socks5 proxy
+  #- name: socks5-proxy
+  #  mode: socks5
+  #  listen: 0.0.0.0:8004
+    
+  #forward tcp to 127.0.0.1:5000
+  - name: tcp-forward
+    mode: tcp
+    listen: 0.0.0.0:8005
+    forward: 127.0.0.1:5000

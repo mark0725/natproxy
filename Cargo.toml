@@ -1,0 +1,29 @@
+[package]
+name = "natproxy"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = [ "mark <mark_0725@outlook.com" ]
+description = "nat proxy by rust"
+repository = "https://github.com/tickbh/wmproxy"
+keywords = ["nat", "proxy", "tunnel"]
+
+
+[dependencies]
+bitflags = "2.4.0"
+chrono = "0.4.31"
+commander = "0.1.5"
+dotenvy = "0.15.7"
+futures-core = {version = "0.3.28", default-features = false }
+lazy_static = "1.4.0"
+log = "0.4.20"
+rustls = {version = "0.21.7", default-features = false}
+rustls-pemfile = "1.0.3"
+serde = {version = "1.0.188", features = ["derive"]}
+serde_json = "1.0.107"
+serde_yaml = "0.9.25"
+simple_logger = "4.2.0"
+tokio = {version = "1.33.0", features = ["full"] }
+tokio-rustls = "0.24.1"
+uuid = {version="1.4.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
+webparse = "0.1.5"

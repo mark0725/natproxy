@@ -26,6 +26,7 @@ use crate::{
 
 const META_MSG_END_FLAG: [u8;1] = [0;1];
 const FORWARD_CONNECTION_BIND_TIMEOUT: u64 = 5;
+const MAIN_CONNECTION_KEEPALIVE_TIMEOUT: u64 = 10;
 
 pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<String>) -> AppResult<()> {
     let datetime =  get_datetime14();
@@ -160,7 +161,7 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
                     });
                     
                     let proto_body = proto::ProtoCmdBody::ProxyRequest { bind_id: _id.clone(), client: String::from("client1"), mapping: proxy_mapping};
-                    let reqcmd = proto::ProtoCmd::Request(proto::ProtoCmdRequest::new(String::from("test"), Some(proto_body)));
+                    let reqcmd = proto::ProtoCmd::Request(proto::ProtoCmdRequest::new(String::from("conn"), Some(proto_body)));
 
                     let json = serde_json::to_string(&reqcmd).unwrap();
                     log::trace!("server: send data: {}", json);
@@ -168,7 +169,7 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
                     main_tls_stream.write(&META_MSG_END_FLAG).await.unwrap();
                     main_tls_stream.flush().await.unwrap();
                 }
-            }
+            },
             clear_msg = clear_rx.recv() => {
                 if let Some(bind_id) = clear_msg {
                     //TODO: optimize id clear
@@ -177,7 +178,17 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
                         log::error!("clear bind client: {}", bind_id);
                     }
                 }
+            },
+            _ = sleep(Duration::from_secs(MAIN_CONNECTION_KEEPALIVE_TIMEOUT)) => {
+                let reqcmd = proto::ProtoCmd::Request(proto::ProtoCmdRequest::new(String::from("keepalive"), None));
+
+                let json = serde_json::to_string(&reqcmd).unwrap();
+                log::trace!("server: send data: {}", json);
+                main_tls_stream.write(json.as_bytes()).await.unwrap();
+                main_tls_stream.write(&META_MSG_END_FLAG).await.unwrap();
+                main_tls_stream.flush().await.unwrap();
             }
+            
         }
     }
 

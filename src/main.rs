@@ -18,6 +18,7 @@ async fn run_main() -> AppResult<()> {
 
     let logger = SimpleLogger::new()
         .with_level(LevelFilter::Off)
+        //.with_local_timestamps()
         .with_module_level("natproxy", log_level)
         .init();
 

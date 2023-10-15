@@ -25,7 +25,7 @@ use crate::{
 };
 
 const META_MSG_END_FLAG: [u8;1] = [0;1];
-const FORWARD_CONNECTION_BIND_TIMEOUT: u64 = 5000;
+const FORWARD_CONNECTION_BIND_TIMEOUT: u64 = 5;
 
 pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<String>) -> AppResult<()> {
     let datetime =  get_datetime14();
@@ -94,25 +94,34 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
            
             main_accept = main_listener.accept() => {
                 let (_socket, _peer_addr) = main_accept.unwrap(); 
-                let mut tls_stream = tls_acceptor.accept(_socket).await.unwrap();
-                log::debug!("forward: Accepted fwd conn with TLS");
+                let tls_accept_result = tls_acceptor.accept(_socket).await;
+                match tls_accept_result {
+                    Ok(mut tls_stream) => {
+                        log::debug!("forward: Accepted fwd conn with TLS");
 
-                let mut recv_buffer: Vec<u8> = Vec::new();
-                let size = tls_server_read_to(&mut tls_stream, &mut recv_buffer, 0).await.unwrap();
-                let res = String::from_utf8(recv_buffer).unwrap();
-                log::debug!("Received from forward connection: {}", res);
-                let bind_v:Vec<&str> = res.split(":").collect();
-                let stream_type= bind_v[0].to_string();
-                if stream_type != "data" {
-                    //TODO: 多客户端支持
-                    continue;
+                        let mut recv_buffer: Vec<u8> = Vec::new();
+                        let size = tls_server_read_to(&mut tls_stream, &mut recv_buffer, 0).await.unwrap();
+                        let res = String::from_utf8(recv_buffer).unwrap();
+                        log::debug!("Received from forward connection: {}", res);
+                        let bind_v:Vec<&str> = res.split(":").collect();
+                        let stream_type= bind_v[0].to_string();
+                        if stream_type != "data" {
+                            //TODO: 多客户端支持
+                            continue;
+                        }
+
+                        let client_id= bind_v[1].to_string();
+                        let bind_id= bind_v[2].to_string();
+                        log::debug!("forward id: {}", res);
+
+                        fwd_tx.send((bind_id, client_id, tls_stream, _peer_addr)).await.unwrap();
+                    },
+                    Err(e) => {
+                        log::error!("Failed to accept TLS connection: {}", e);
+                    }
                 }
 
-                let client_id= bind_v[1].to_string();
-                let bind_id= bind_v[2].to_string();
-                log::debug!("forward id: {}", res);
-
-                fwd_tx.send((bind_id, client_id, tls_stream, _peer_addr)).await.unwrap();
+                
             },
 
             fwd_msg = fwd_rx.recv() => {
@@ -143,8 +152,11 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
                     let clear_tx = clear_tx.clone();
                     let cls_bind_id = _id.clone();
                     tokio::spawn(async move {
-                        sleep(Duration::from_millis(FORWARD_CONNECTION_BIND_TIMEOUT)).await;
-                        clear_tx.send(cls_bind_id).await.unwrap();
+                        sleep(Duration::from_secs(FORWARD_CONNECTION_BIND_TIMEOUT)).await;
+                        if !clear_tx.is_closed() {
+                            clear_tx.send(cls_bind_id).await.unwrap();
+                        }
+                        
                     });
                     
                     let proto_body = proto::ProtoCmdBody::ProxyRequest { bind_id: _id.clone(), client: String::from("client1"), mapping: proxy_mapping};
@@ -234,8 +246,8 @@ async fn server_start_proxy(mappings:& Vec<MappingConfig>
 }
 
 async fn server_data_forward(tls_stream:&mut TlsServerStream<TcpStream>, tcp_stream: &mut TcpStream) -> Result<usize, tokio::io::Error>  {
-    let mut tls_recv_buffer:[u8; 1024] = [0; 1024];
-    let mut dst_recv_buffer:[u8; 1024] = [0; 1024];
+    let mut tls_recv_buffer:[u8; 4096] = [0; 4096];
+    let mut dst_recv_buffer:[u8; 4096] = [0; 4096];
     log::trace!("start forward data ....");
     loop {
 

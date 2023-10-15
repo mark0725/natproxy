@@ -86,7 +86,16 @@ impl Builder {
 
     pub fn mappings(self, mappings: String) -> Builder {
         self.and_then(|mut option| {
-            option.mappings = serde_json::from_str(&mappings).unwrap();
+            let res = serde_json::from_str(&mappings);
+            match res {
+                Ok(val) =>  {
+                    option.mappings = val;
+                },
+                Err(e) => {
+                    log::error!("Failed to parse mappings:[{}] error{}", mappings, e);
+                    panic!("Failed to parse mappings:[{}] error{}", mappings, e);
+                }
+            }
             Ok(option)
         })
     }

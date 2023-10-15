@@ -19,6 +19,7 @@ pub async fn start_client_node(option: AppOption) -> AppResult<()> {
     let cert_file = option.cert.clone().unwrap();
     let key_file = option.key.clone().unwrap();
 
+    log::info!("connect to server: {}", option.server.unwrap().to_string());
     let mut tls_stream = new_tls_stream("localhost", option.server.unwrap(), &ca_file, &cert_file, &key_file).await;
     let client_id = generate_uuid();
     let client_name = String::from("client1");
@@ -111,8 +112,8 @@ async fn client_forward(option: AppOption, bind_id:String, client:String, mappin
 }
 
 async fn client_data_forward(tls_stream:&mut TlsClientStream<TcpStream>, tcp_stream: &mut TcpStream) -> Result<usize, tokio::io::Error>  {
-    let mut tls_recv_buffer:[u8; 1024] = [0; 1024];
-    let mut dst_recv_buffer:[u8; 1024] = [0; 1024];
+    let mut tls_recv_buffer:[u8; 4096] = [0; 4096];
+    let mut dst_recv_buffer:[u8; 4096] = [0; 4096];
     log::trace!("start process data ....");
     loop {
         select! {

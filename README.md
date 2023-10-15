@@ -2,7 +2,7 @@
 
 TCP forward+proxy，tcp forward and http/https/socks5 Proxy。
 
-> communication path：`user -tcp-> natpoxy server -forward-> natproxy client -proxy-> app`
+> communication path：`user -tcp-> natpoxy server -forward-> natproxy client --> app`
 
 ## Overview
 
@@ -24,7 +24,7 @@ cargo install --path .
 Build Docker image:
 
 ```
-docker build -t nat-proxy:`sed -n '3'p Cargo.toml|sed 's/"//g'|awk '{print $3}'`-scratch -f Dockerfile.scratch .
+docker build -t natproxy:`sed -n '3'p Cargo.toml|sed 's/"//g'|awk '{print $3}'`-scratch -f Dockerfile.scratch .
 ```
 
 ## Install and start
@@ -67,11 +67,10 @@ NATPOXY_MAPPINGS='[{"name":"tcp-forward", "mode":"tcp", "listen":"127.0.0.1:8005
 
 ```bash
 natproxy --role client \
--S 127.0.0.1:8100 \
+-S 127.0.0.1:8001 \
 --ca /<path-to-file>/ca.pem  \
 --cert /<path-to-file>/client1.pem \
 --key /<path-to-file>/client1.key
---mappings '[{"name":"tcp-forward", "mode":"tcp", "listen":"127.0.0.1:8005", "forward":"127.0.0.1:5000"}]'
 ```
 * Using config file
 
@@ -103,7 +102,7 @@ natproxy --help
 * Start server
 
 ```bash
-docker run -d --name nat-proxy \
+docker run -d --name natproxy \
   -p 8001:8001 \
   -p 8005:8005 \
   -e "NATPROXY_ROLE=server" \
@@ -111,7 +110,7 @@ docker run -d --name nat-proxy \
   -e "NATPROXY_CA_CERT=/appuser/certs/ca.pem" \
   -e "NATPROXY_CERT=/appuser/certs/server.pem" \
   -e "NATPROXY_KEY=/appuser/certs/server.key" \
-  -e "NATPROXY_MAPPINGS='[{\"name\":\"tcp-forward\", \"mode\":\"tcp\", \"listen\":\"127.0.0.1:8005\", \"forward\":\"127.0.0.1:5000\"}]'" \
+  -e "NATPROXY_MAPPINGS=[{\"name\":\"tcp-forward\", \"mode\":\"tcp\", \"listen\":\"0.0.0.0:8005\", \"forward\":\"127.0.0.1:5000\"}]" \
   -v "/natproxy/certs:/appuser/certs" \
   natproxy:<version>-scratch
   
@@ -120,7 +119,7 @@ docker run -ti --rm natproxy:<version>-scratch
 * Start client
 
 ```bash
-docker run -d --name nat-proxy \
+docker run -d --name natproxy \
   -e "NATPROXY_ROLE=client" \
   -e "NATPROXY_SERVER=127.0.0.1:8001" \
   -e "NATPROXY_CA_CERT=/appuser/certs/ca.pem" \
@@ -289,6 +288,6 @@ This project is licensed under the [MIT license](LICENSE).
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in Tokio by you, shall be licensed as MIT, without any additional
+for inclusion in NATProxy by you, shall be licensed as MIT, without any additional
 terms or conditions.
 

@@ -35,9 +35,12 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
     let cert_file = option.cert.clone().unwrap();
     let key_file = option.key.clone().unwrap();
 
+    let server_signal_addr = SocketAddr::new(option.listen.clone(), option.signal_port);
+    let data_signal_addr = SocketAddr::new(option.listen.clone(), option.data_port);
     let tls_acceptor = new_tls_acceptor(&ca_file, &cert_file, &key_file);
 
-    let main_listener = TcpListener::bind(option.listen).await.unwrap();
+    let main_listener = TcpListener::bind(server_signal_addr).await.unwrap();
+    let data_listener = TcpListener::bind(data_signal_addr).await.unwrap();
     let mut bind_queue = HashMap::new();
     
     //let (cmd_tx, mut cmd_rx) = mpsc::channel::<(String, SocketAddr)>(32);
@@ -93,8 +96,8 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
                 
             },
            
-            main_accept = main_listener.accept() => {
-                let (_socket, _peer_addr) = main_accept.unwrap(); 
+            data_accept = data_listener.accept() => {
+                let (_socket, _peer_addr) = data_accept.unwrap(); 
                 let tls_accept_result = tls_acceptor.accept(_socket).await;
                 match tls_accept_result {
                     Ok(mut tls_stream) => {
@@ -107,13 +110,13 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
                         let bind_v:Vec<&str> = res.split(":").collect();
                         let stream_type= bind_v[0].to_string();
                         if stream_type != "data" {
-                            //TODO: 多客户端支持
+                            log::error!("Received msg type error: {}", res);
                             continue;
                         }
 
                         let client_id= bind_v[1].to_string();
                         let bind_id= bind_v[2].to_string();
-                        log::debug!("forward id: {}", res);
+                        log::debug!("forward: {}", res);
 
                         fwd_tx.send((bind_id, client_id, tls_stream, _peer_addr)).await.unwrap();
                     },
@@ -257,8 +260,8 @@ async fn server_start_proxy(mappings:& Vec<MappingConfig>
 }
 
 async fn server_data_forward(tls_stream:&mut TlsServerStream<TcpStream>, tcp_stream: &mut TcpStream) -> Result<usize, tokio::io::Error>  {
-    let mut tls_recv_buffer:[u8; 4096] = [0; 4096];
-    let mut dst_recv_buffer:[u8; 4096] = [0; 4096];
+    let mut tls_recv_buffer:[u8; 1024] = [0; 1024];
+    let mut dst_recv_buffer:[u8; 1024] = [0; 1024];
     log::trace!("start forward data ....");
     loop {
 
@@ -267,15 +270,27 @@ async fn server_data_forward(tls_stream:&mut TlsServerStream<TcpStream>, tcp_str
                 match dst_res {
                     Ok(size) => {
                         if size > 0 {
-                            tls_stream.write(&dst_recv_buffer[0..size]).await.unwrap();
                             log::trace!("send data to forward size:{}", size);
+                            tls_stream.write_all(&dst_recv_buffer[0..size]).await.unwrap();
+                            tls_stream.flush().await.unwrap();
+                            log::debug!("sended data to forward size:{}", size);
                         } else {
-                            log::trace!("proxy client closed");
-                            break;
+                            //log::trace!("proxy client closed");
+                            //break;
                         }
                     },
                     Err(e) => {
-                        return Err(e); 
+                        let err_kind = e.kind();
+                        match err_kind {
+                            std::io::ErrorKind::UnexpectedEof => {
+                                log::info!("tcp stream connection closed");
+                                break;
+                            },
+                            _ => {
+                                log::error!("read from tcp stream error: {}", e);
+                                return Err(e);
+                            }
+                        }
                     }
                 }
             },
@@ -283,15 +298,27 @@ async fn server_data_forward(tls_stream:&mut TlsServerStream<TcpStream>, tcp_str
                 match fwd_res {
                     Ok(size) => {
                         if size > 0 {
-                            tcp_stream.write_all(&tls_recv_buffer[0..size]).await.unwrap();
                             log::trace!("send data to source size:{}", size);
+                            tcp_stream.write_all(&tls_recv_buffer[0..size]).await.unwrap();
+                            tcp_stream.flush().await.unwrap();
+                            log::trace!("sended data to source size:{}", size);
                         } else {
-                            log::trace!("forward connection closed");
-                            break;
+                            //log::trace!("forward connection closed");
+                            //break;
                         }
                     },
                     Err(e) => {
-                        return Err(e); 
+                        let err_kind = e.kind();
+                        match err_kind {
+                            std::io::ErrorKind::UnexpectedEof => {
+                                log::debug!("tls stream connection closed");
+                                break;
+                            },
+                            _ => {
+                                log::error!("read from tls stream error: {}", e);
+                                return Err(e);
+                            }
+                        } 
                     }
                 }
             }

@@ -3,6 +3,7 @@ use std::env;
 use dotenvy;
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
+use natproxy::Logger;
 
 async fn run_main() -> AppResult<()> {
     let option = AppOption::parse_env()?;  
@@ -21,6 +22,7 @@ async fn run_main() -> AppResult<()> {
         //.with_local_timestamps()
         .with_module_level("natproxy", log_level)
         .init();
+    //log::set_boxed_logger(Box::new(Logger {})).unwrap();
 
     let mut app = App::new(option);
     app.start().await?;

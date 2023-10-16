@@ -21,10 +21,16 @@ cargo install --path .
 ```
 ### Using Docker
 
-Build Docker image:
+* Build Docker image, base from scratch image:
 
 ```
 docker build -t natproxy:`sed -n '3'p Cargo.toml|sed 's/"//g'|awk '{print $3}'`-scratch -f Dockerfile.scratch .
+```
+
+* Build Docker image, base from alpineimage:
+
+```
+docker build -t natproxy:`sed -n '3'p Cargo.toml|sed 's/"//g'|awk '{print $3}'`-alpine -f Dockerfile.alpine .
 ```
 
 ## Install and start
@@ -37,11 +43,13 @@ docker build -t natproxy:`sed -n '3'p Cargo.toml|sed 's/"//g'|awk '{print $3}'`-
 
 ```bash
 natproxy --role server \ 
---listen 0.0.0.0:8001 \
+--listen 0.0.0.0 \
+--signal_port 8001 \
+--data_port 8002 \
 --ca /<path-to-file>/ca.pem  \
 --cert /<path-to-file>/server.pem \
 --key /<path-to-file>/server.key \
---pass proxy
+--pass proxy123
 ```
 * Using config file
 
@@ -53,7 +61,9 @@ natproxy -c <path-to-config>/server.yaml
 
 ```
 NATPROXY_ROLE=server
-NATPROXY_LISTEN=0.0.0.0:8001
+NATPROXY_LISTEN=0.0.0.0
+NATPROXY_SIGNAL_PORT=8001
+NATPROXY_DATA_PORT=8002
 NATPROXY_CA_CERT=./<path-to-file>/ca.pem
 NATPROXY_CERT=./<path-to-file>/server.pem
 NATPROXY_KEY=./<path-to-file>/server.key
@@ -67,7 +77,9 @@ NATPOXY_MAPPINGS='[{"name":"tcp-forward", "mode":"tcp", "listen":"127.0.0.1:8005
 
 ```bash
 natproxy --role client \
--S 127.0.0.1:8001 \
+-S 127.0.0.1 \
+--signal_port 8001 \
+--data_port 8002 \
 --ca /<path-to-file>/ca.pem  \
 --cert /<path-to-file>/client1.pem \
 --key /<path-to-file>/client1.key
@@ -82,7 +94,9 @@ natproxy -c <path-to-config>/client.yaml
 
 ```
 NATPROXY_ROLE=client
-NATPROXY_SERVER=127.0.0.1:8001
+NATPROXY_SERVER=127.0.0.1
+NATPROXY_SIGNAL_PORT=8001
+NATPROXY_DATA_PORT=8002
 NATPROXY_CA_CERT=./<path-to-file>/ca.pem
 NATPROXY_CERT=./<path-to-file>/client1.pem
 NATPROXY_KEY=./<path-to-file>/client1.key
@@ -104,9 +118,12 @@ natproxy --help
 ```bash
 docker run -d --name natproxy \
   -p 8001:8001 \
+  -p 8002:8002 \
   -p 8005:8005 \
   -e "NATPROXY_ROLE=server" \
-  -e "NATPROXY_LISTEN=0.0.0.0:8001" \
+  -e "NATPROXY_LISTEN=0.0.0.0" \
+  -e "NATPROXY_SIGNAL_PORT=8001" \
+  -e "NATPROXY_DATA_SIGNAL=8002" \
   -e "NATPROXY_CA_CERT=/appuser/certs/ca.pem" \
   -e "NATPROXY_CERT=/appuser/certs/server.pem" \
   -e "NATPROXY_KEY=/appuser/certs/server.key" \
@@ -121,10 +138,12 @@ docker run -ti --rm natproxy:<version>-scratch
 ```bash
 docker run -d --name natproxy \
   -e "NATPROXY_ROLE=client" \
-  -e "NATPROXY_SERVER=127.0.0.1:8001" \
+  -e "NATPROXY_SERVER=127.0.0.1" \
+  -e "NATPROXY_SIGNAL_PORT=8001" \
+  -e "NATPROXY_DATA_SIGNAL=8002" \
   -e "NATPROXY_CA_CERT=/appuser/certs/ca.pem" \
-  -e "NATPROXY_CERT=/appuser/certs/server.pem" \
-  -e "NATPROXY_KEY=/appuser/certs/server.key" \
+  -e "NATPROXY_CERT=/appuser/certs/client1.pem" \
+  -e "NATPROXY_KEY=/appuser/certs/client1.key" \
   -v "/natproxy/certs:/appuser/certs" \
   natproxy:<version>-scratch
   
@@ -140,7 +159,9 @@ docker run -ti --rm natproxy:<version>-scratch
 role: server
 
 #server listen address
-listen: 127.0.0.1:8100
+listen: 127.0.0.1
+signal_port: 8001
+data_port: 8002
 
 #The trusted CA certificate file in PEM format used to verify the cert.
 ca_cert: /<path-to-file>/ca.pem
@@ -189,7 +210,9 @@ mappings:
 role: client
 
 #NATProxy Server addr
-server: 127.0.0.1:8091
+server: 127.0.0.1
+signal_port: 8001
+data_port: 8002
 
 #The trusted CA certificate file in PEM format used to verify the cert.
 ca_cert: /<path-to-file>/ca.pem

@@ -2,7 +2,9 @@
 role: server
 
 #server listen address
-listen: 127.0.0.1:8001
+listen: 0.0.0.0
+signal_port: 8001
+data_port: 8002
 
 #The trusted CA certificate file in PEM format used to verify the cert.
 ca_cert: ./config/ca.pem

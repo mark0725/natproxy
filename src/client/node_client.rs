@@ -20,7 +20,8 @@ pub async fn start_client_node(option: AppOption) -> AppResult<()> {
     let key_file = option.key.clone().unwrap();
 
     log::info!("connect to server: {}", option.server.unwrap().to_string());
-    let mut tls_stream = new_tls_stream("localhost", option.server.unwrap(), &ca_file, &cert_file, &key_file).await;
+    let server_signal_addr = SocketAddr::new(option.server.clone().unwrap(), option.signal_port);
+    let mut tls_stream = new_tls_stream("localhost", server_signal_addr, &ca_file, &cert_file, &key_file).await;
     let client_id = generate_uuid();
     let client_name = String::from("client1");
 
@@ -87,16 +88,21 @@ async fn client_forward(option: AppOption, bind_id:String, client:String, mappin
     let cert_file = option.cert.clone().unwrap();
     let key_file = option.key.clone().unwrap();
     
+    let server_data_addr = SocketAddr::new(option.server.clone().unwrap(), option.data_port);
     let dst_addr:SocketAddr = mapping.forward.parse().unwrap();
 
     let meta_msg:String = format!("data:{}:{}", client, bind_id);
     
     tokio::spawn(async move { 
-        let mut tls_fwd_stream = new_tls_stream("localhost", option.server.unwrap(), &ca_file, &cert_file, &key_file).await;
+        log::debug!("connect to {}", server_data_addr.to_string());
+        let mut tls_fwd_stream = new_tls_stream("localhost", server_data_addr, &ca_file, &cert_file, &key_file).await;
+        log::debug!("connected to {}", server_data_addr.to_string());
         tls_fwd_stream.write(meta_msg.clone().as_bytes()).await.unwrap();
         tls_fwd_stream.write(&META_MSG_END_FLAG).await.unwrap();
+        tls_fwd_stream.flush().await.unwrap();
         log::debug!("connect to app {:?}", dst_addr);
         let mut dst_stream = TcpStream::connect(dst_addr).await.unwrap();
+        log::debug!("connected to app {:?}", dst_addr);
         let result = client_data_forward(&mut tls_fwd_stream, &mut dst_stream).await;
         match result {
             Ok(size) => {
@@ -112,8 +118,8 @@ async fn client_forward(option: AppOption, bind_id:String, client:String, mappin
 }
 
 async fn client_data_forward(tls_stream:&mut TlsClientStream<TcpStream>, tcp_stream: &mut TcpStream) -> Result<usize, tokio::io::Error>  {
-    let mut tls_recv_buffer:[u8; 4096] = [0; 4096];
-    let mut dst_recv_buffer:[u8; 4096] = [0; 4096];
+    let mut tls_recv_buffer:[u8; 1024] = [0; 1024];
+    let mut dst_recv_buffer:[u8; 1024] = [0; 1024];
     log::trace!("start process data ....");
     loop {
         select! {
@@ -123,14 +129,25 @@ async fn client_data_forward(tls_stream:&mut TlsClientStream<TcpStream>, tcp_str
                         if size > 0 {
                             log::trace!("send data to app size:{}", size);
                             tcp_stream.write_all(&tls_recv_buffer[0..size]).await.unwrap();
+                            tcp_stream.flush().await.unwrap();
                             log::trace!("sended data to app size:{}", size);
                         } else {
-                            log::info!("forward connection closed");
-                            break;
+                            //log::info!("forward connection closed");
+                            //break;
                         }
                     },
                     Err(e) => {
-                        return Err(e);
+                        let err_kind = e.kind();
+                        match err_kind {
+                            std::io::ErrorKind::UnexpectedEof => {
+                                log::info!("tls stream  connection closed");
+                                break;
+                            },
+                            _ => {
+                                log::error!("read from tls stream error: {}", e);
+                                return Err(e);
+                            }
+                        }
                     }
                 }
                 
@@ -141,15 +158,25 @@ async fn client_data_forward(tls_stream:&mut TlsClientStream<TcpStream>, tcp_str
                     Ok(size) => {
                         if size > 0 {
                             log::trace!("send data to forward port size:{}", size);
-                            tls_stream.write(&dst_recv_buffer[0..size]).await.unwrap();
+                            tls_stream.write_all(&dst_recv_buffer[0..size]).await.unwrap();
+                            tls_stream.flush().await.unwrap();
                             log::trace!("sended data to forward port size:{}", size);
                         } else {
-                            log::info!("app connection closed");
-                            break;
+                            //
                         }
                     },
                     Err(e) => {
-                        return Err(e);
+                        let err_kind = e.kind();
+                        match err_kind {
+                            std::io::ErrorKind::UnexpectedEof => {
+                                log::info!("tcp stream connection closed");
+                                break;
+                            },
+                            _ => {
+                                log::error!("read from tcp stream error: {}", e);
+                                return Err(e);
+                            }
+                        }
                     }
                 }
             }

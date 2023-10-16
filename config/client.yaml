@@ -2,7 +2,9 @@
 role: client
 
 #NATProxy Server addr
-server: 127.0.0.1:8001
+server: 127.0.0.1
+signal_port: 8001
+data_port: 8002
 
 #The trusted CA certificate file in PEM format used to verify the cert.
 ca_cert: ./config/ca.pem

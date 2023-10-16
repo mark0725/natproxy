@@ -34,7 +34,7 @@ impl Builder {
     }
 
 
-    pub fn listen_addr(self, addr: SocketAddr) -> Builder {
+    pub fn listen_addr(self, addr: IpAddr) -> Builder {
         self.and_then(|mut option| {
             option.listen = addr;
             Ok(option)
@@ -42,9 +42,23 @@ impl Builder {
     }
 
 
-    pub fn server(self, addr: Option<SocketAddr>) -> Builder {
+    pub fn server(self, addr: Option<IpAddr>) -> Builder {
         self.and_then(|mut option| {
             option.server = addr;
+            Ok(option)
+        })
+    }
+
+    pub fn signal_port(self, port: u16) -> Builder {
+        self.and_then(|mut option| {
+            option.signal_port = port;
+            Ok(option)
+        })
+    }
+
+    pub fn data_port(self, port: u16) -> Builder {
+        self.and_then(|mut option| {
+            option.data_port = port;
             Ok(option)
         })
     }
@@ -115,8 +129,8 @@ fn default_proxy_on() -> Vec<String> {
     vec![String::from("tcp")]
 }
 
-fn default_listen_addr() -> SocketAddr {
-    "0.0.0.0:8001".parse().unwrap()
+fn default_listen_addr() -> IpAddr {
+    "0.0.0.0".parse().unwrap()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -125,9 +139,11 @@ pub struct AppOption {
     pub role: String,
 
     #[serde(default = "default_listen_addr")]
-    pub listen: SocketAddr,
+    pub listen: IpAddr,
+    pub signal_port: u16,
+    pub data_port: u16,
 
-    pub server: Option<SocketAddr>,
+    pub server: Option<IpAddr>,
 
     /// ca证书文件
     pub ca_cert: Option<String>,
@@ -154,6 +170,8 @@ impl Default for AppOption {
         Self {
             role: "server".to_string(),
             listen: default_listen_addr(),
+            signal_port: 8001,
+            data_port: 8002,
             server: None,
         
             ca_cert: None,
@@ -181,28 +199,16 @@ impl AppOption {
     pub fn parse_env() -> AppResult<AppOption> {
         let command = Commander::new()
             .version(&env!("CARGO_PKG_VERSION").to_string())
-            .usage("--listen 0.0.0.0:8001")
-            .usage_desc("natproxy -R server --listen 0.0.0.0:8001")
-            .option_list(
-                "--proxy_on [value]",
-                "proxy enables: http https socks5 tcp httpreverse",
-                None,
-            )
-            .option_str(
-                "-R, --role value",
-                "client, server, all: client and server",
-                None,
-            )
-            .option_str("-c, --config", "config file path", None)
-            // .option("--proxy value", "是否只接收来自代理的连接", Some(false))
+            .usage("--listen 0.0.0.0")
+            .usage_desc("natproxy -R server --listen 0.0.0.0")
+            .option_list( "--proxy_on [value]", "proxy enables: http https socks5 tcp httpreverse", None, )
+            .option_str( "-R, --role value", "client, server, all: client and server", None, ) .option_str("-c, --config", "config file path", None)
+             // .option("--proxy value", "是否只接收来自代理的连接", Some(false))
             .option_str("--ca value", "The trusted CA certificate file in PEM format used to verify the cert", None)
             .option_str("--cert value", "Certificate used for mTLS between server/client nodes.", None)
-            .option_str("--key value", "Certificate key", None)
-            .option_str(
-                "-L, --listen value",
-                "server listen address",
-                Some("0.0.0.0:8001".to_string()),
-            )
+            .option_str("--key value", "Certificate key", None).option_str( "-L, --listen value", "server listen address", Some("0.0.0.0".to_string()),)
+            .option_str("--data_port value", "server port for forward data: default 8002", None)
+            .option_str("--signal_port value", "server port for signal msg: default 8001", None)
             .option_str("-S, --server value", "server address: 127.0.0.1:8001", None)
             .option_str("--pass value", "proxy password", None)
             .option_str("--log value", "log level", None)
@@ -227,10 +233,16 @@ impl AppOption {
                         builder = builder.role(v);
                     }
                     "LISTEN" => {
-                        builder = builder.listen_addr(v.parse::<SocketAddr>().unwrap());
+                        builder = builder.listen_addr(v.parse::<IpAddr>().unwrap());
                     }
                     "SERVER" => {
                         builder = builder.server(v.parse().ok());
+                    }
+                    "SIGNAL_PORT" => {
+                        builder = builder.signal_port(v.parse::<u16>().unwrap());
+                    }
+                    "DATA_PORT" => {
+                        builder = builder.data_port(v.parse::<u16>().unwrap());
                     }
                     "CA_CERT" => {
                         builder = builder.ca_cert(Some(v));
@@ -258,7 +270,19 @@ impl AppOption {
 
         let listen_host = command.get_str("listen");
         match listen_host {
-            Some(val) => builder = builder.listen_addr(val.parse::<SocketAddr>().unwrap()),
+            Some(val) => builder = builder.listen_addr(val.parse::<IpAddr>().unwrap()),
+            None => {}
+        }
+
+        let v = command.get_str("signal_port");
+        match v {
+            Some(val) => builder = builder.signal_port(val.parse::<u16>().unwrap()),
+            None => {}
+        }
+
+        let v = command.get_str("data_port");
+        match v {
+            Some(val) => builder = builder.data_port(val.parse::<u16>().unwrap()),
             None => {}
         }
 
@@ -301,7 +325,7 @@ impl AppOption {
 
         let server = command.get_str("S");
         match server {
-            Some(val) => builder = builder.server(val.parse::<SocketAddr>().ok()),
+            Some(val) => builder = builder.server(val.parse::<IpAddr>().ok()),
             None => {}
         }
 

@@ -1,6 +1,6 @@
 [package]
 name = "natproxy"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 license = "MIT"
 authors = [ "mark <mark_0725@outlook.com" ]

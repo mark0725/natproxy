@@ -45,9 +45,9 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
     
     //let (cmd_tx, mut cmd_rx) = mpsc::channel::<(String, SocketAddr)>(32);
 
-    let (clear_tx, mut clear_rx) = mpsc::channel::<String>(32);
-    let (fwd_tx, mut fwd_rx) = mpsc::channel::<(String, String, TlsServerStream<TcpStream>, SocketAddr)>(32);
-    let (proxy_tx, mut proxy_rx) = mpsc::channel::<(String, String,  oneshot::Sender<(String, String, TlsServerStream<TcpStream>, SocketAddr)>)>(32);
+    let (clear_tx, mut clear_rx) = mpsc::channel::<String>(1000);
+    let (fwd_tx, mut fwd_rx) = mpsc::channel::<(String, String, TlsServerStream<TcpStream>, SocketAddr)>(1000);
+    let (proxy_tx, mut proxy_rx) = mpsc::channel::<(String, String,  oneshot::Sender<(String, String, TlsServerStream<TcpStream>, SocketAddr)>)>(1000);
     let (_socket, _peer_addr)  = main_listener.accept().await.unwrap();
     let mut main_tls_stream = tls_acceptor.accept(_socket).await.unwrap();
     let mut recv_buffer: Vec<u8> = Vec::new();
@@ -75,7 +75,8 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
                             log::debug!("recv from client: {}", res);
                             let recv_cmd: proto::ProtoCmd = serde_json::from_str(&res).unwrap();
                         } else {
-                            return Ok(());
+                            log::debug!("signal connection read {}", size);
+                            //return Ok(());
                         }
                     },
                     Err(e) => {
@@ -194,8 +195,6 @@ pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<S
             
         }
     }
-
-    Ok(())
 
 }
 

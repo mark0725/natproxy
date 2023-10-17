@@ -10,6 +10,10 @@ Used for NAT intranet penetration, and supports access to intranet services thro
 
 The client and server directly support active and passive connection modes.
 
+### How it works
+
+![work flow](./assets/workflow.png)
+
 ## Build
 
 ###  Source Code

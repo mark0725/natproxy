@@ -1,5 +1,13 @@
 # NATProxy
 
+[![Build Status][build-badge]][build-link]
+[![MIT License][license-badge]][license-link]
+
+[build-badge]: https://github.com/mark0725/natproxy/workflows/Rust/badge.svg?branch=main
+[build-link]: https://github.com/mark0725/natproxy/actions?query=workflow%3ARust+branch%3Amaster
+[license-badge]: https://img.shields.io/github/license/mark0725/natproxy
+[license-link]: https://github.com/mark0725/natproxy/blob/master/LICENSE
+
 TCP forward+proxy，tcp forward and http/https/socks5 Proxy。
 
 > communication path：`user -tcp-> natpoxy server -forward-> natproxy client --> app`

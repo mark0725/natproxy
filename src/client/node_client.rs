@@ -128,8 +128,8 @@ async fn client_data_forward(tls_stream:&mut TlsClientStream<TcpStream>, tcp_str
                     Ok(size) => {
                         if size > 0 {
                             log::trace!("send data to app size:{}", size);
-                            tcp_stream.write_all(&tls_recv_buffer[0..size]).await.unwrap();
-                            tcp_stream.flush().await.unwrap();
+                            tcp_stream.write_all(&tls_recv_buffer[0..size]).await?;
+                            tcp_stream.flush().await?;
                             log::trace!("sended data to app size:{}", size);
                         } else {
                             //log::info!("forward connection closed");
@@ -157,9 +157,10 @@ async fn client_data_forward(tls_stream:&mut TlsClientStream<TcpStream>, tcp_str
                 match dst_res {
                     Ok(size) => {
                         if size > 0 {
+
                             log::trace!("send data to forward port size:{}", size);
-                            tls_stream.write_all(&dst_recv_buffer[0..size]).await.unwrap();
-                            tls_stream.flush().await.unwrap();
+                            tls_stream.write_all(&dst_recv_buffer[0..size]).await?;
+                            tls_stream.flush().await?;
                             log::trace!("sended data to forward port size:{}", size);
                         } else {
                             //

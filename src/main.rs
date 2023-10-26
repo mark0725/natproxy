@@ -2,8 +2,7 @@ use natproxy::{AppOption, AppResult, App};
 use std::env;
 use dotenvy;
 use log::LevelFilter;
-use simple_logger::SimpleLogger;
-use natproxy::Logger;
+use lite_log::LiteLogger;
 
 async fn run_main() -> AppResult<()> {
     let option = AppOption::parse_env()?;  
@@ -17,12 +16,11 @@ async fn run_main() -> AppResult<()> {
         _ => LevelFilter::Info
     };
 
-    let logger = SimpleLogger::new()
+    let logger = LiteLogger::new()
         .with_level(LevelFilter::Off)
-        //.with_local_timestamps()
+        .with_local_timestamps()
         .with_module_level("natproxy", log_level)
         .init();
-    //log::set_boxed_logger(Box::new(Logger {})).unwrap();
 
     let mut app = App::new(option);
     app.start().await?;

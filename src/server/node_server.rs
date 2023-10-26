@@ -26,7 +26,7 @@ use crate::{
 
 const META_MSG_END_FLAG: [u8;1] = [0;1];
 const FORWARD_CONNECTION_BIND_TIMEOUT: u64 = 5;
-const MAIN_CONNECTION_KEEPALIVE_TIMEOUT: u64 = 10;
+const MAIN_CONNECTION_KEEPALIVE_TIMEOUT: u64 = 120;
 
 pub async fn start_server_node(option: AppOption, main_cli_rx: watch::Receiver<String>) -> AppResult<()> {
     let datetime =  get_datetime14();
